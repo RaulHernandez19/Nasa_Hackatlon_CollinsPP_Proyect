@@ -102,7 +102,7 @@
         });
 
         async function obtenerDatosNEO() {
-            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,ma,e,a,i,om,w&sb-class=IEO";
+            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -116,40 +116,53 @@
             }
         }
 
-        // Función para convertir parámetros Keplerianos a coordenadas cartesianas (simplificado)
         function keplerianToCartesian(params) {
-            // Simplificación para posicionar los NEOs en el espacio
-            const semiMajorAxis = params.semi_major_axis; // Semieje mayor en AU
-            const eccentricity = params.eccentricity;
-            const inclination = params.inclination;
-
-            // Conversión simple a grados para visualización
-            const longitude = params.long_of_asc_node;
-            const latitude = params.inclination; // Usando inclinación como latitud
-
+            const semiMajorAxis = params.a; // Semieje mayor en AU
+            const eccentricity = params.e;
+            const inclination = params.i * (Math.PI / 180); // Convertir grados a radianes
+            const longitudeOfAscendingNode = params.om * (Math.PI / 180); // Convertir grados a radianes
+            const argumentOfPeriapsis = params.w * (Math.PI / 180); // Convertir grados a radianes
+            const meanAnomaly = params.ma * (Math.PI / 180); // Convertir grados a radianes
+        
+            // Calcular la posición en coordenadas heliocéntricas
+            const E = meanAnomaly + (eccentricity * Math.sin(meanAnomaly)); // Ecuación de Kepler
+            const x = semiMajorAxis * (Math.cos(E) - eccentricity);
+            const y = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(E);
+        
+            // Rotación de los ejes según los elementos orbitales
+            const xRot = (x * (Math.cos(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) - Math.sin(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination))) -
+                         (y * (Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) + Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination)));
+        
+            const yRot = (x * (Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) + Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) * Math.cos(inclination))) +
+                         (y * (Math.cos(argumentOfPeriapsis) * Math.cos(inclination)));
+        
+            const z = y * Math.sin(inclination);
+        
             // Convertimos a coordenadas cartesianas
-            return Cesium.Cartesian3.fromDegrees(longitude, latitude, semiMajorAxis * 1e6); // Multiplicamos por 1e6 para ajustar la escala
+            return new Cesium.Cartesian3(xRot * 149597870.7, yRot * 149597870.7, z * 149597870.7); // Multiplicar por AU a km
         }
 
         function agregarNEOs(neoData) {
             console.log("Agregando NEOs:", neoData); // Agrega esta línea para ver qué datos se están procesando
             neoData.forEach(neo => {
                 const params = {
-                    semi_major_axis: neo[4],  // Semieje mayor
-                    eccentricity: neo[3],     // Excentricidad
-                    inclination: neo[5],      // Inclinación
-                    mean_anomaly: neo[2],     // Anomalía media
-                    arg_of_periapsis: neo[6], // Argumento del perihelio
-                    long_of_asc_node: neo[7]  // Longitud del nodo ascendente
+                    a: neo[4],  // Semieje mayor
+                    e: neo[3],  // Excentricidad
+                    i: neo[5],  // Inclinación
+                    w: neo[6],  // Argumento del perihelio
+                    om: neo[7], // Longitud del nodo ascendente
+                    ma: neo[2], // Anomalía media
+                    diameter: neo[8] || 1 // Usar el diámetro si está disponible o 1 km como valor predeterminado
                 };
-        
+                
                 const position = keplerianToCartesian(params);
-        
+                
+                // Escalar el tamaño del objeto basándose en el diámetro
                 viewer.entities.add({
                     position: position,
-                    point: {
-                        pixelSize: 10,
-                        color: Cesium.Color.RED,
+                    ellipsoid: {
+                        radii: new Cesium.Cartesian3(params.diameter / 2 * 1000, params.diameter / 2 * 1000, params.diameter / 2 * 1000), // Convertir a metros
+                        material: Cesium.Color.RED.withAlpha(0.6),
                     },
                     label: {
                         text: neo[0],  // Nombre del objeto
