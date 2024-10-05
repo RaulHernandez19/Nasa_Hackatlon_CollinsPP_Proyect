@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,7 +20,10 @@
     <div id="cesiumContainer"></div>
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
-        // Inicializar el visor de Cesium sin widgets de header y bottom
+        // Asigna tu Cesium Ion Access Token personalizado
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzJhZjE2NC1mOWQ2LTQ4NTItODRlMC0zZDkyMWMyYWI4ODMiLCJpZCI6MjQ2MTMxLCJpYXQiOjE3MjgxNTM2MTR9.BDbM94S9z_B2W2sq25ib4WgLdYVQgZnYegUTdWEuIes';
+
+        // Inicializar el visor de Cesium
         const viewer = new Cesium.Viewer('cesiumContainer', {
             timeline: false, // Eliminar el timeline (parte inferior)
             animation: false, // Eliminar el widget de animación (parte inferior izquierda)
@@ -31,6 +36,87 @@
             infoBox: false, // Eliminar el cuadro de información
             selectionIndicator: false // Eliminar el indicador de selección
         });
+
+        async function obtenerDatosNEO() {
+            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,ma,e,a,i,om,w&sb-class=IEO";
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`); 
+                }
+                const data = await response.json();
+                console.log(data.data); // Verificar la respuesta
+                return data.data; // Los datos que nos interesan
+            } catch (error) {
+                console.error('Error al obtener datos NEO:', error);
+            }
+        }
+
+        // Función para convertir parámetros Keplerianos a coordenadas cartesianas (simplificado)
+        function keplerianToCartesian(params) {
+            // Simplificación para posicionar los NEOs en el espacio
+            const semiMajorAxis = params.semi_major_axis; // Semieje mayor en AU
+            const eccentricity = params.eccentricity;
+            const inclination = params.inclination;
+
+            // Conversión simple a grados para visualización
+            const longitude = params.long_of_asc_node;
+            const latitude = params.inclination; // Usando inclinación como latitud
+
+            // Convertimos a coordenadas cartesianas
+            return Cesium.Cartesian3.fromDegrees(longitude, latitude, semiMajorAxis * 1e6); // Multiplicamos por 1e6 para ajustar la escala
+        }
+
+        function agregarNEOs(neoData) {
+            console.log("Agregando NEOs:", neoData); // Agrega esta línea para ver qué datos se están procesando
+            neoData.forEach(neo => {
+                const params = {
+                    semi_major_axis: neo[4],  // Semieje mayor
+                    eccentricity: neo[3],     // Excentricidad
+                    inclination: neo[5],      // Inclinación
+                    mean_anomaly: neo[2],     // Anomalía media
+                    arg_of_periapsis: neo[6], // Argumento del perihelio
+                    long_of_asc_node: neo[7]  // Longitud del nodo ascendente
+                };
+        
+                const position = keplerianToCartesian(params);
+        
+                viewer.entities.add({
+                    position: position,
+                    point: {
+                        pixelSize: 10,
+                        color: Cesium.Color.RED,
+                    },
+                    label: {
+                        text: neo[0],  // Nombre del objeto
+                        font: '12pt monospace',
+                        fillColor: Cesium.Color.WHITE,
+                    }
+                });
+            });
+        }
+
+        // Llamamos a la función para obtener los datos y agregarlos al visor
+        obtenerDatosNEO().then(agregarNEOs);
+
+        viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(0, 0, 5000000), // Ajusta el tercer parámetro para controlar la altura
+        });
+
+        viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(-122.22, 37.77, 1000000), // Coordenadas de ejemplo
+            point: {
+                pixelSize: 10,
+                color: Cesium.Color.RED,
+            },
+            label: {
+                text: "NEO Prueba",  // Nombre del objeto
+                font: '12pt monospace',
+                fillColor: Cesium.Color.WHITE,
+            }
+        });
+
+        // Aquí puedes agregar tu código para personalizar el visor o agregar entidades
     </script>
 </body>
 </html>
