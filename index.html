@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -79,9 +77,10 @@
     <div id="cesiumContainer"></div>
     <div id="infoPanel">
         <span id="closeInfoPanel">&times;</span>
-        <h2>Información de la Tierra</h2>
+        <h2>Información del Cuerpo Celeste</h2>
         <p id="planetInfo">Cargando información...</p>
     </div>
+    <!-- Incluir CesiumJS -->
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
         // Asigna tu Cesium Ion Access Token personalizado
@@ -101,99 +100,111 @@
             selectionIndicator: false // Eliminar el indicador de selección
         });
 
-        async function obtenerDatosNEO() {
-            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
+        // Función para convertir AU a metros
+        function auToMeters(au) {
+            return au * 149597870700; // 1 AU = 149,597,870,700 metros
+        }
+
+        // Función para obtener posiciones de planetas desde la API
+        async function obtenerPosicionesPlanetas(fecha) {
             try {
-                const response = await fetch(url);
+                const response = await fetch(`http://127.0.0.1:5000/api/planet_positions?fecha=${fecha}`);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`); 
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
-                console.log(data.data); // Verificar la respuesta
-                return data.data; // Los datos que nos interesan
+                return data;
             } catch (error) {
-                console.error('Error al obtener datos NEO:', error);
+                console.error('Error al obtener posiciones de planetas:', error);
+                return null;
             }
         }
 
-        function keplerianToCartesian(params) {
-            const semiMajorAxis = params.a; // Semieje mayor en AU
-            const eccentricity = params.e;
-            const inclination = params.i * (Math.PI / 180); // Convertir grados a radianes
-            const longitudeOfAscendingNode = params.om * (Math.PI / 180); // Convertir grados a radianes
-            const argumentOfPeriapsis = params.w * (Math.PI / 180); // Convertir grados a radianes
-            const meanAnomaly = params.ma * (Math.PI / 180); // Convertir grados a radianes
-        
-            // Calcular la posición en coordenadas heliocéntricas
-            const E = meanAnomaly + (eccentricity * Math.sin(meanAnomaly)); // Ecuación de Kepler
-            const x = semiMajorAxis * (Math.cos(E) - eccentricity);
-            const y = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(E);
-        
-            // Rotación de los ejes según los elementos orbitales
-            const xRot = (x * (Math.cos(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) - Math.sin(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination))) -
-                         (y * (Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) + Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination)));
-        
-            const yRot = (x * (Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) + Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) * Math.cos(inclination))) +
-                         (y * (Math.cos(argumentOfPeriapsis) * Math.cos(inclination)));
-        
-            const z = y * Math.sin(inclination);
-        
-            // Convertimos a coordenadas cartesianas
-            return new Cesium.Cartesian3(xRot * 149597870.7, yRot * 149597870.7, z * 149597870.7); // Multiplicar por AU a km
-        }
+        // Función para agregar planetas al visor
+        async function agregarPlanetas() {
+            const fecha = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+            const posiciones = await obtenerPosicionesPlanetas(fecha);
 
-        function agregarNEOs(neoData) {
-            console.log("Agregando NEOs:", neoData); // Agrega esta línea para ver qué datos se están procesando
-            neoData.forEach(neo => {
-                const params = {
-                    a: neo[4],  // Semieje mayor
-                    e: neo[3],  // Excentricidad
-                    i: neo[5],  // Inclinación
-                    w: neo[6],  // Argumento del perihelio
-                    om: neo[7], // Longitud del nodo ascendente
-                    ma: neo[2], // Anomalía media
-                    diameter: neo[8] || 1 // Usar el diámetro si está disponible o 1 km como valor predeterminado
-                };
-                
-                const position = keplerianToCartesian(params);
-                
-                // Escalar el tamaño del objeto basándose en el diámetro
+            if (!posiciones) {
+                console.error('No se pudieron obtener las posiciones de los planetas.');
+                return;
+            }
+
+            // Mapeo de radios planetarios en metros
+            const radios = {
+                mercury: 2439700,
+                venus: 6051800,
+                earth: 6371000,
+                mars: 3389500,
+                jupiter: 69911000,
+                saturn: 58232000,
+                uranus: 25362000,
+                neptune: 24622000,
+                pluto: 1188300 // Opcional
+            };
+
+            for (const [nombre, pos] of Object.entries(posiciones)) {
+                if (pos.error) {
+                    console.warn(`No se pudo obtener la posición de ${nombre}: ${pos.error}`);
+                    continue;
+                }
+
+                // Convertir coordenadas de AU a metros
+                const x = auToMeters(pos.x);
+                const y = auToMeters(pos.y);
+                const z = auToMeters(pos.z);
+
+                const cesiumPosition = new Cesium.Cartesian3(x, y, z);
+
+                // Agregar el planeta al visor
                 viewer.entities.add({
-                    position: position,
+                    name: nombre.charAt(0).toUpperCase() + nombre.slice(1),
+                    position: cesiumPosition,
                     ellipsoid: {
-                        radii: new Cesium.Cartesian3(params.diameter / 2 * 1000, params.diameter / 2 * 1000, params.diameter / 2 * 1000), // Convertir a metros
-                        material: Cesium.Color.RED.withAlpha(0.6),
+                        radii: new Cesium.Cartesian3(radios[nombre], radios[nombre], radios[nombre]),
+                        material: Cesium.Color.BLUE.withAlpha(0.6),
                     },
                     label: {
-                        text: neo[0],  // Nombre del objeto
-                        font: '12pt monospace',
+                        text: nombre.charAt(0).toUpperCase() + nombre.slice(1),
+                        font: '14pt sans-serif',
                         fillColor: Cesium.Color.WHITE,
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        pixelOffset: new Cesium.Cartesian2(0, -20),
                     }
                 });
-            });
+            }
         }
 
-        // Llamamos a la función para obtener los datos y agregarlos al visor
-        obtenerDatosNEO().then(agregarNEOs);
+        // Llamar a la función para agregar planetas
+        agregarPlanetas();
 
+        // Configurar la cámara para ver el sistema solar
         viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(0, 0, 5000000), // Ajusta el tercer parámetro para controlar la altura
-        });
-
-        viewer.entities.add({
-            position: Cesium.Cartesian3.fromDegrees(-122.22, 37.77, 1000000), // Coordenadas de ejemplo
-            point: {
-                pixelSize: 10,
-                color: Cesium.Color.RED,
+            destination: new Cesium.Cartesian3(0, 0, 5 * 149597870700), // 5 AU en metros
+            orientation: {
+                heading: Cesium.Math.toRadians(0.0),
+                pitch: Cesium.Math.toRadians(-90.0),
+                roll: 0.0
             },
-            label: {
-                text: "NEO Prueba",  // Nombre del objeto
-                font: '12pt monospace',
-                fillColor: Cesium.Color.WHITE,
-            }
+            duration: 3
         });
 
-        // Aquí puedes agregar tu código para personalizar el visor o agregar entidades
+        // Manejar el cierre del panel de información
+        document.getElementById('closeInfoPanel').onclick = function() {
+            document.getElementById('infoPanel').style.display = 'none';
+        };
+
+        // Manejar clics en entidades para mostrar información
+        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        handler.setInputAction(function(click) {
+            const pickedObject = viewer.scene.pick(click.position);
+            if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.id)) {
+                const nombre = pickedObject.id.name;
+                document.getElementById('infoPanel').style.display = 'block';
+                document.getElementById('infoPanel').querySelector('h2').innerText = `Información de ${nombre}`;
+                document.getElementById('infoPanel').querySelector('#planetInfo').innerText = `Detalles de ${nombre}...`;
+            }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     </script>
 </body>
 </html>
