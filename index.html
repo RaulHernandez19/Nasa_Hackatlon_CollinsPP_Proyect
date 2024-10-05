@@ -84,10 +84,14 @@
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
         // Asigna tu Cesium Ion Access Token personalizado
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzJhZjE2NC1mOWQ2LTQ4NTItODRlMC0zZDkyMWMyYWI4ODMiLCJpZCI6MjQ2MTMxLCJpYXQiOjE3MjgxNTM2MTR9.BDbM94S9z_B2W2sq25ib4WgLdYVQgZnYegUTdWEuIes';
+        Cesium.Ion.defaultAccessToken = 'TU_CESIUM_ION_ACCESS_TOKEN_AQUÍ';
 
         // Inicializar el visor de Cesium
         const viewer = new Cesium.Viewer('cesiumContainer', {
+            sceneMode: Cesium.SceneMode.SCENE3D,
+            globe: false, // Desactiva la visualización de la Tierra
+            skyBox: false, // Opcional: desactivar el skybox
+            skyAtmosphere: false, // Opcional: desactivar la atmósfera
             timeline: false, // Eliminar el timeline (parte inferior)
             animation: false, // Eliminar el widget de animación (parte inferior izquierda)
             fullscreenButton: false, // Eliminar botón de pantalla completa
@@ -100,6 +104,45 @@
             selectionIndicator: false // Eliminar el indicador de selección
         });
 
+        // Establecer el color de fondo negro para simular el espacio
+        viewer.scene.backgroundColor = Cesium.Color.BLACK;
+
+        // Definir la posición del Sol en el centro
+        const sunPosition = new Cesium.Cartesian3(0, 0, 0);
+
+        // Agregar el Sol al visor
+        viewer.entities.add({
+            name: 'Sun',
+            position: sunPosition,
+            ellipsoid: {
+                radii: new Cesium.Cartesian3(696340000 * 10, 696340000 * 10, 696340000 * 10), // Escalar el Sol
+                material: Cesium.Color.YELLOW.withAlpha(0.8),
+            },
+            label: {
+                text: 'Sun',
+                font: '14pt sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -20),
+            }
+        });
+
+        // Factor para escalar el tamaño de los planetas
+        const escalaTamano = 1000;
+
+        // Mapeo de radios planetarios en metros (escalados)
+        const radios = {
+            mercury: 2439700 * escalaTamano,
+            venus: 6051800 * escalaTamano,
+            earth: 6371000 * escalaTamano,
+            mars: 3389500 * escalaTamano,
+            jupiter: 69911000 * escalaTamano,
+            saturn: 58232000 * escalaTamano,
+            uranus: 25362000 * escalaTamano,
+            neptune: 24622000 * escalaTamano,
+            pluto: 1188300 * escalaTamano // Opcional
+        };
+
         // Función para convertir AU a metros
         function auToMeters(au) {
             return au * 149597870700; // 1 AU = 149,597,870,700 metros
@@ -108,6 +151,7 @@
         // Función para obtener posiciones de planetas desde la API
         async function obtenerPosicionesPlanetas(fecha) {
             try {
+                // Asegúrate de que la URL apunte al servidor Flask correcto
                 const response = await fetch(`http://127.0.0.1:5000/api/planet_positions?fecha=${fecha}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -130,19 +174,6 @@
                 return;
             }
 
-            // Mapeo de radios planetarios en metros
-            const radios = {
-                mercury: 2439700,
-                venus: 6051800,
-                earth: 6371000,
-                mars: 3389500,
-                jupiter: 69911000,
-                saturn: 58232000,
-                uranus: 25362000,
-                neptune: 24622000,
-                pluto: 1188300 // Opcional
-            };
-
             for (const [nombre, pos] of Object.entries(posiciones)) {
                 if (pos.error) {
                     console.warn(`No se pudo obtener la posición de ${nombre}: ${pos.error}`);
@@ -162,14 +193,16 @@
                     position: cesiumPosition,
                     ellipsoid: {
                         radii: new Cesium.Cartesian3(radios[nombre], radios[nombre], radios[nombre]),
-                        material: Cesium.Color.BLUE.withAlpha(0.6),
+                        material: Cesium.Color.fromRandom({
+                            alpha: 1.0
+                        }),
                     },
                     label: {
                         text: nombre.charAt(0).toUpperCase() + nombre.slice(1),
                         font: '14pt sans-serif',
                         fillColor: Cesium.Color.WHITE,
-                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                        pixelOffset: new Cesium.Cartesian2(0, -20),
+                        verticalOrigin: Cesium.VerticalOrigin.TOP,
+                        pixelOffset: new Cesium.Cartesian2(0, 20),
                     }
                 });
             }
@@ -179,14 +212,13 @@
         agregarPlanetas();
 
         // Configurar la cámara para ver el sistema solar
-        viewer.camera.flyTo({
-            destination: new Cesium.Cartesian3(0, 0, 5 * 149597870700), // 5 AU en metros
+        viewer.camera.setView({
+            destination: new Cesium.Cartesian3(0, -3e11, 1e11),
             orientation: {
                 heading: Cesium.Math.toRadians(0.0),
-                pitch: Cesium.Math.toRadians(-90.0),
+                pitch: Cesium.Math.toRadians(-15.0),
                 roll: 0.0
-            },
-            duration: 3
+            }
         });
 
         // Manejar el cierre del panel de información
