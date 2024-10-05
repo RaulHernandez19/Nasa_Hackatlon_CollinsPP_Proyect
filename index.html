@@ -1,23 +1,87 @@
 
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CesiumJS App</title>
+    <title>CesiumJS Orrery</title>
     <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <style>
+        /* Estilos para el contenedor de Cesium */
         #cesiumContainer {
             width: 100%;
             height: 100vh;
             margin: 0;
             padding: 0;
         }
+
+        /* Estilos para el panel de información */
+        #infoPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            max-height: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            display: none; /* Oculto por defecto */
+            overflow-y: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000; /* Asegura que esté por encima del visor */
+        }
+
+        #infoPanel h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+
+        #closeInfoPanel {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #333;
+        }
+
+        /* Estilos adicionales opcionales */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Estilos responsivos */
+        @media (max-width: 600px) {
+            #infoPanel {
+                width: 90%;
+                left: 50%;
+                transform: translateX(-50%);
+                right: auto;
+            }
+        }
+
+        /* Ocultar cualquier indicador de selección residual */
+        .cesium-selectionIndicator {
+            display: none !important;
+        }
+
+        /* Opcional: Ocultar el tooltip de selección si existe */
+        .cesium-tooltip {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
     <div id="cesiumContainer"></div>
+    <div id="infoPanel">
+        <span id="closeInfoPanel">&times;</span>
+        <h2>Información de la Tierra</h2>
+        <p id="planetInfo">Cargando información...</p>
+    </div>
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
         // Asigna tu Cesium Ion Access Token personalizado
