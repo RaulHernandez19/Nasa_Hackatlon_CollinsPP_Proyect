@@ -1,36 +1,153 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CesiumJS App</title>
+    <title>CesiumJS Orrery</title>
     <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <style>
+        /* Estilos para el contenedor de Cesium */
         #cesiumContainer {
             width: 100%;
             height: 100vh;
             margin: 0;
             padding: 0;
         }
+
+        /* Estilos para el panel de información */
+        #infoPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            max-height: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            display: none; /* Oculto por defecto */
+            overflow-y: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000; /* Asegura que esté por encima del visor */
+        }
+
+        #infoPanel h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+
+        #closeInfoPanel {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #333;
+        }
+
+        /* Estilos adicionales opcionales */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Estilos responsivos */
+        @media (max-width: 600px) {
+            #infoPanel {
+                width: 90%;
+                left: 50%;
+                transform: translateX(-50%);
+                right: auto;
+            }
+        }
+
+        /* Ocultar cualquier indicador de selección residual */
+        .cesium-selectionIndicator {
+            display: none !important;
+        }
+
+        /* Opcional: Ocultar el tooltip de selección si existe */
+        .cesium-tooltip {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
     <div id="cesiumContainer"></div>
+    <div id="infoPanel">
+        <span id="closeInfoPanel">&times;</span>
+        <h2>Información de la Tierra</h2>
+        <p id="planetInfo">Cargando información...</p>
+    </div>
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
         // Inicializar el visor de Cesium sin widgets de header y bottom
         const viewer = new Cesium.Viewer('cesiumContainer', {
-            timeline: false, // Eliminar el timeline (parte inferior)
-            animation: false, // Eliminar el widget de animación (parte inferior izquierda)
-            fullscreenButton: false, // Eliminar botón de pantalla completa
-            homeButton: false, // Eliminar botón de inicio
-            sceneModePicker: false, // Eliminar selector de modos de escena
-            baseLayerPicker: false, // Eliminar selector de capa base
-            geocoder: false, // Eliminar el geocodificador
-            navigationHelpButton: false, // Eliminar botón de ayuda de navegación
-            infoBox: false, // Eliminar el cuadro de información
-            selectionIndicator: false // Eliminar el indicador de selección
+            timeline: false,
+            animation: false,
+            fullscreenButton: false,
+            homeButton: false,
+            sceneModePicker: false,
+            baseLayerPicker: false,
+            geocoder: false,
+            navigationHelpButton: false,
+            infoBox: false,
+            selectionIndicator: false, // Asegurar que esté deshabilitado
+            // Agregar estas opciones adicionales para mayor seguridad
+            shouldAnimate: false,
+            shadows: false
         });
+
+        // Asegurar que no hay ninguna entidad seleccionada
+        viewer.selectedEntity = undefined;
+
+        // Manejar clics en el visor
+        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+        handler.setInputAction(function (click) {
+            // Obtener la posición del clic en coordenadas cartesianas
+            const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+            if (cartesian) {
+                // El clic está sobre la Tierra
+                showPlanetInfo();
+                // Asegurar que no haya selección residual
+                viewer.selectedEntity = undefined;
+            } else {
+                // El clic está fuera de la Tierra (en el espacio)
+                hidePlanetInfo();
+                // Asegurar que no haya selección residual
+                viewer.selectedEntity = undefined;
+            }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+        // Función para mostrar la información del planeta
+        function showPlanetInfo() {
+            const infoPanel = document.getElementById('infoPanel');
+            const planetInfo = document.getElementById('planetInfo');
+            
+            // Puedes actualizar esta información dinámicamente si es necesario
+            planetInfo.innerHTML = `
+                <strong>Nombre:</strong> Tierra<br>
+                <strong>Diámetro:</strong> 12,742 km<br>
+                <strong>Órbita:</strong> 365.25 días<br>
+                <strong>Población:</strong> Aproximadamente 8 mil millones<br>
+                <strong>Satélites:</strong> 1 (Luna)<br>
+                <strong>Continentes:</strong> Asia, África, América del Norte, América del Sur, Europa, Australia y la Antártida<br>
+                <strong>Océanos:</strong> Pacífico, Atlántico, Índico, Austral y Ártico<br>
+                <!-- Agrega más información según sea necesario -->
+            `;
+            infoPanel.style.display = 'block';
+        }
+
+        // Función para ocultar la información del planeta
+        function hidePlanetInfo() {
+            const infoPanel = document.getElementById('infoPanel');
+            infoPanel.style.display = 'none';
+        }
+
+        // Manejar el cierre del panel de información
+        document.getElementById('closeInfoPanel').addEventListener('click', hidePlanetInfo);
     </script>
 </body>
 </html>
