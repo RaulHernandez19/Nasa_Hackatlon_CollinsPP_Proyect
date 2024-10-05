@@ -18,8 +18,19 @@
     <div id="cesiumContainer"></div>
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
-        // Inicializar el visor de Cesium
-        const viewer = new Cesium.Viewer('cesiumContainer');
+        // Inicializar el visor de Cesium sin widgets de header y bottom
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            timeline: false, // Eliminar el timeline (parte inferior)
+            animation: false, // Eliminar el widget de animación (parte inferior izquierda)
+            fullscreenButton: false, // Eliminar botón de pantalla completa
+            homeButton: false, // Eliminar botón de inicio
+            sceneModePicker: false, // Eliminar selector de modos de escena
+            baseLayerPicker: false, // Eliminar selector de capa base
+            geocoder: false, // Eliminar el geocodificador
+            navigationHelpButton: false, // Eliminar botón de ayuda de navegación
+            infoBox: false, // Eliminar el cuadro de información
+            selectionIndicator: false // Eliminar el indicador de selección
+        });
     </script>
 </body>
 </html>
