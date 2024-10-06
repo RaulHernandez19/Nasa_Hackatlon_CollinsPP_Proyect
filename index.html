@@ -62,44 +62,17 @@
                 right: auto;
             }
         }
-
-        /* Ocultar cualquier indicador de selección residual */
-        .cesium-selectionIndicator {
-            display: none !important;
-        }
-
-        /* Opcional: Ocultar el tooltip de selección si existe */
-        .cesium-tooltip {
-            display: none !important;
-        }
-
-        /* Estilo para el panel de control */
-        #controlPanel {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            width: 150px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 8px;
-            z-index: 1000;
-        }
-
-        
-
-
     </style>
 </head>
 <body>
     <div id="cesiumContainer"></div>
 
-    
-
     <div id="infoPanel">
         <span id="closeInfoPanel">&times;</span>
-        <h2>Información de la Tierra</h2>
+        <h2 id="planetName">Información del Objeto</h2>
         <p id="planetInfo">Cargando información...</p>
     </div>
+
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
     <script>
         // Asigna tu Cesium Ion Access Token personalizado
@@ -107,17 +80,27 @@
 
         // Inicializar el visor de Cesium
         const viewer = new Cesium.Viewer('cesiumContainer', {
-            timeline: false, // Eliminar el timeline (parte inferior)
-            animation: false, // Eliminar el widget de animación (parte inferior izquierda)
-            fullscreenButton: false, // Eliminar botón de pantalla completa
-            homeButton: false, // Eliminar botón de inicio
-            sceneModePicker: false, // Eliminar selector de modos de escena
-            baseLayerPicker: false, // Eliminar selector de capa base
-            geocoder: false, // Eliminar el geocodificador
-            navigationHelpButton: false, // Eliminar botón de ayuda de navegación
-            infoBox: false, // Eliminar el cuadro de información
-            selectionIndicator: false // Eliminar el indicador de selección
+            timeline: false,
+            animation: false,
+            fullscreenButton: false,
+            homeButton: false,
+            sceneModePicker: false,
+            baseLayerPicker: false,
+            geocoder: false,
+            navigationHelpButton: false,
+            infoBox: false,
+            selectionIndicator: false
         });
+
+        const infoPanel = document.getElementById('infoPanel');
+        const closeInfoPanel = document.getElementById('closeInfoPanel');
+        const planetName = document.getElementById('planetName');
+        const planetInfo = document.getElementById('planetInfo');
+
+        // Cerrar el panel de información cuando se hace clic en la "X"
+        closeInfoPanel.onclick = () => {
+            infoPanel.style.display = 'none';
+        };
 
         async function obtenerDatosNEO() {
             const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
@@ -127,79 +110,121 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
-                console.log(data.data); // Verificar la respuesta
-                return data.data; // Los datos que nos interesan
+                return data.data;
             } catch (error) {
                 console.error('Error al obtener datos NEO:', error);
             }
         }
 
         function keplerianToCartesian(params) {
-            const semiMajorAxis = params.a; // Semieje mayor en AU
+            const semiMajorAxis = params.a;
             const eccentricity = params.e;
-            const inclination = params.i * (Math.PI / 180); // Convertir grados a radianes
-            const longitudeOfAscendingNode = params.om * (Math.PI / 180); // Convertir grados a radianes
-            const argumentOfPeriapsis = params.w * (Math.PI / 180); // Convertir grados a radianes
-            const meanAnomaly = params.ma * (Math.PI / 180); // Convertir grados a radianes
-        
-            // Calcular la posición en coordenadas heliocéntricas
-            const E = meanAnomaly + (eccentricity * Math.sin(meanAnomaly)); // Ecuación de Kepler
+            const inclination = params.i * (Math.PI / 180);
+            const longitudeOfAscendingNode = params.om * (Math.PI / 180);
+            const argumentOfPeriapsis = params.w * (Math.PI / 180);
+            const meanAnomaly = params.ma * (Math.PI / 180);
+
+            const E = meanAnomaly + (eccentricity * Math.sin(meanAnomaly));
             const x = semiMajorAxis * (Math.cos(E) - eccentricity);
             const y = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(E);
-        
-            // Rotación de los ejes según los elementos orbitales
+
             const xRot = (x * (Math.cos(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) - Math.sin(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination))) -
                          (y * (Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) + Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination)));
-        
+
             const yRot = (x * (Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) + Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) * Math.cos(inclination))) +
                          (y * (Math.cos(argumentOfPeriapsis) * Math.cos(inclination)));
-        
+
             const z = y * Math.sin(inclination);
-        
-            // Convertimos a coordenadas cartesianas
-            return new Cesium.Cartesian3(xRot * 149597870.7, yRot * 149597870.7, z * 149597870.7); // Multiplicar por AU a km
+
+            return new Cesium.Cartesian3(xRot * 149597870.7, yRot * 149597870.7, z * 149597870.7);
         }
 
         function agregarNEOs(neoData) {
             neoData.forEach(neo => {
                 const params = {
-                    a: neo[4],  // Semieje mayor
-                    e: neo[3],  // Excentricidad
-                    i: neo[5],  // Inclinación
-                    w: neo[6],  // Argumento del perihelio
-                    om: neo[7], // Longitud del nodo ascendente
-                    ma: neo[2], // Anomalía media
-                    diameter: neo[8] || 1  // Diámetro aproximado (en km)
+                    a: neo[4],
+                    e: neo[3],
+                    i: neo[5],
+                    w: neo[6],
+                    om: neo[7],
+                    ma: neo[2],
+                    diameter: neo[8] || 1
                 };
 
-                // Calcular la posición en coordenadas cartesianas
                 const position = keplerianToCartesian(params);
-                const radius = params.diameter / 2 * 1000;  // Convertir a metros
+                const radius = params.diameter / 2 * 1000;
 
-                // Añadir el asteroide como entidad elipsoide con variación de forma para simular un asteroide de forma irregular
-                viewer.entities.add({
+                const asteroid = viewer.entities.add({
                     position: position,
                     ellipsoid: {
                         radii: new Cesium.Cartesian3(
-                            radius * (1 + Math.random() * 0.6 - 0.3),  // Mayor variación aleatoria en cada eje para simular formas irregulares
+                            radius * (1 + Math.random() * 0.6 - 0.3),
                             radius * (1 + Math.random() * 0.6 - 0.3),
                             radius * (1 + Math.random() * 0.6 - 0.3)
                         ),
                         material: new Cesium.ImageMaterialProperty({
-                            image: 'asteroid-1/ground_0010_color_1k.jpg',  // Ruta de la imagen local para texturizar el asteroide
+                            image: 'asteroid-1/ground_0010_color_1k.jpg',
                             repeat: new Cesium.Cartesian2(1.0, 1.0)
                         })
                     },
                     label: {
-                        text: neo[0],  // Nombre del NEO
+                        text: neo[0],
                         font: '12pt monospace',
-                        fillColor: Cesium.Color.WHITE,
+                        fillColor: Cesium.Color.WHITE
                     }
                 });
+
+                // Asociar los datos del asteroide con la entidad
+                asteroid.planetData = {
+                    name: neo[0],
+                    diameter: params.diameter,
+                    eccentricity: params.e,
+                    inclination: params.i
+                };
             });
         }
 
-        // Obtener los datos y agregar los NEOs al visor
+        // Agregar la Tierra como una entidad clickeable
+        const earth = viewer.entities.add({
+            name: 'Earth',
+            position: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 0.0),
+            model: {
+                uri: Cesium.IonResource.fromAssetId(3), // Modelo de la Tierra
+                minimumPixelSize: 128,
+                maximumScale: 20000
+            },
+            ellipsoid: {
+                radii: new Cesium.Cartesian3(6378137.0, 6378137.0, 6378137.0),
+                material: Cesium.Color.BLUE.withAlpha(0.0), // Hacer invisible el elipsoide
+                show: false // Ocultar el elipsoide para evitar conflictos visuales
+            }
+        });
+        earth.planetData = {
+            name: 'Earth',
+            diameter: 12742,
+            eccentricity: 0.0167,
+            inclination: 0
+        };
+
+        // Mostrar el panel de información al hacer doble clic en una entidad
+        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        handler.setInputAction(function (movement) {
+            const pickedObject = viewer.scene.pick(movement.position);
+            if (Cesium.defined(pickedObject)) {
+                const entity = pickedObject.id;
+
+                if (entity.planetData) {
+                    planetName.textContent = entity.planetData.name;
+                    planetInfo.innerHTML = `
+                        <strong>Diámetro:</strong> ${entity.planetData.diameter} km<br>
+                        <strong>Excentricidad:</strong> ${entity.planetData.eccentricity}<br>
+                        <strong>Inclinación:</strong> ${entity.planetData.inclination}°
+                    `;
+                    infoPanel.style.display = 'block';
+                }
+            }
+        }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
         obtenerDatosNEO().then(neoData => {
             if (neoData) {
                 agregarNEOs(neoData);
