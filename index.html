@@ -72,10 +72,29 @@
         .cesium-tooltip {
             display: none !important;
         }
+
+        /* Estilo para el panel de control */
+        #controlPanel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 150px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+
+        
+
+
     </style>
 </head>
 <body>
     <div id="cesiumContainer"></div>
+
+    
+
     <div id="infoPanel">
         <span id="closeInfoPanel">&times;</span>
         <h2>Información de la Tierra</h2>
