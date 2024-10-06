@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CesiumJS Orrery</title>
     <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noisejs/2.0.0/perlin.min.js"></script>
     <style>
         /* Estilos para el contenedor de Cesium */
@@ -15,65 +16,42 @@
             padding: 0;
         }
 
-        /* Estilos para el panel de información */
-        #infoPanel {
-            position: absolute;
+        #infoModal {
+            position: fixed;
             top: 10px;
             right: 10px;
             width: 300px;
-            max-height: 400px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 8px;
-            display: none; /* Oculto por defecto */
-            overflow-y: auto;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            z-index: 1000; /* Asegura que esté por encima del visor */
+            z-index: 1050;
+            display: none;
         }
 
-        #infoPanel h2 {
-            margin-top: 0;
-            font-size: 1.5em;
-        }
-
-        #closeInfoPanel {
-            position: absolute;
-            top: 5px;
-            right: 10px;
-            cursor: pointer;
-            font-size: 1.2em;
-            color: #333;
-        }
-
-        /* Estilos adicionales opcionales */
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
             overflow: hidden;
         }
-
-        /* Estilos responsivos */
-        @media (max-width: 600px) {
-            #infoPanel {
-                width: 90%;
-                left: 50%;
-                transform: translateX(-50%);
-                right: auto;
-            }
-        }
     </style>
 </head>
 <body>
     <div id="cesiumContainer"></div>
 
-    <div id="infoPanel">
-        <span id="closeInfoPanel">&times;</span>
-        <h2 id="planetName">Información del Objeto</h2>
-        <p id="planetInfo">Cargando información...</p>
+    <!-- Modal personalizado -->
+    <div class="modal-content" id="infoModal">
+        <div class="modal-header">
+            <h5 class="modal-title" id="infoModalLabel">Información del Objeto</h5>
+            <button type="button" class="close" id="closeModal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="modal-body">
+            <h6 id="planetName">Nombre del Objeto</h6>
+            <p id="planetInfo">Cargando información...</p>
+        </div>
     </div>
 
     <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script>
         // Asigna tu Cesium Ion Access Token personalizado
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzJhZjE2NC1mOWQ2LTQ4NTItODRlMC0zZDkyMWMyYWI4ODMiLCJpZCI6MjQ2MTMxLCJpYXQiOjE3MjgxNTM2MTR9.BDbM94S9z_B2W2sq25ib4WgLdYVQgZnYegUTdWEuIes';
@@ -92,14 +70,14 @@
             selectionIndicator: false
         });
 
-        const infoPanel = document.getElementById('infoPanel');
-        const closeInfoPanel = document.getElementById('closeInfoPanel');
         const planetName = document.getElementById('planetName');
         const planetInfo = document.getElementById('planetInfo');
+        const infoModal = document.getElementById('infoModal');
+        const closeModal = document.getElementById('closeModal');
 
-        // Cerrar el panel de información cuando se hace clic en la "X"
-        closeInfoPanel.onclick = () => {
-            infoPanel.style.display = 'none';
+        // Cerrar el modal al hacer clic en el botón de cierre
+        closeModal.onclick = () => {
+            infoModal.style.display = 'none';
         };
 
         async function obtenerDatosNEO() {
@@ -206,7 +184,7 @@
             inclination: 0
         };
 
-        // Mostrar el panel de información al hacer doble clic en una entidad
+        // Mostrar el modal personalizado al hacer doble clic en una entidad
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
         handler.setInputAction(function (movement) {
             const pickedObject = viewer.scene.pick(movement.position);
@@ -220,7 +198,7 @@
                         <strong>Excentricidad:</strong> ${entity.planetData.eccentricity}<br>
                         <strong>Inclinación:</strong> ${entity.planetData.inclination}°
                     `;
-                    infoPanel.style.display = 'block';
+                    infoModal.style.display = 'block';
                 }
             }
         }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
