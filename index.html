@@ -1,30 +1,16 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CesiumJS Orrery</title>
-    <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/noisejs/2.0.0/perlin.min.js"></script>
+    <title>Orrery with Sun-Centered Orbits and Earth at Origin</title>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.87/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <style>
-        /* Estilos para el contenedor de Cesium */
         #cesiumContainer {
             width: 100%;
             height: 100vh;
             margin: 0;
             padding: 0;
         }
-
-        #infoModal {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 300px;
-            z-index: 1050;
-            display: none;
-        }
-
         body, html {
             margin: 0;
             padding: 0;
@@ -35,186 +21,234 @@
 </head>
 <body>
     <div id="cesiumContainer"></div>
-
-    <!-- Modal personalizado -->
-    <div class="modal-content" id="infoModal">
-        <div class="modal-header">
-            <h5 class="modal-title" id="infoModalLabel">Información del Objeto</h5>
-            <button type="button" class="close" id="closeModal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        <div class="modal-body">
-            <h6 id="planetName">Nombre del Objeto</h6>
-            <p id="planetInfo">Cargando información...</p>
-        </div>
-    </div>
-
-    <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.87/Build/Cesium/Cesium.js"></script>
     <script>
-        // Asigna tu Cesium Ion Access Token personalizado
+        // Initialize Cesium Viewer
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzJhZjE2NC1mOWQ2LTQ4NTItODRlMC0zZDkyMWMyYWI4ODMiLCJpZCI6MjQ2MTMxLCJpYXQiOjE3MjgxNTM2MTR9.BDbM94S9z_B2W2sq25ib4WgLdYVQgZnYegUTdWEuIes';
-
-        // Inicializar el visor de Cesium
         const viewer = new Cesium.Viewer('cesiumContainer', {
             timeline: false,
             animation: false,
-            fullscreenButton: false,
-            homeButton: false,
             sceneModePicker: false,
             baseLayerPicker: false,
             geocoder: false,
+            homeButton: false,
+            fullscreenButton: false,
             navigationHelpButton: false,
-            infoBox: false,
-            selectionIndicator: false
+            skyBox: false,
+            skyAtmosphere: false,
+            backgroundColor: Cesium.Color.BLACK
         });
 
-        const planetName = document.getElementById('planetName');
-        const planetInfo = document.getElementById('planetInfo');
-        const infoModal = document.getElementById('infoModal');
-        const closeModal = document.getElementById('closeModal');
-
-        // Cerrar el modal al hacer clic en el botón de cierre
-        closeModal.onclick = () => {
-            infoModal.style.display = 'none';
+        // NASA Planetary Data from API (positions in AU)
+        const planetData = {
+            "sun": { "x": 0, "y": 0, "z": 0 }, // Sun at origin
+            "earth": { "x": 0.9747037759215772, "y": 0.2225969912755935, "z": -0.00001606858767451231 },
+            "moon": { "x": 0.969772847365557, "y": 0.2340944772529008, "z": -0.0002090087091702586 },
+            "jupiter": { "x": 1.695718817715909, "y": 4.76179136588304, "z": -0.05771889168073751 },
+            "mars": { "x": 0.620700255060626, "y": 1.375692985216991, "z": 0.01360445098469851 },
+            "mercury": { "x": -0.3818991770447907, "y": -0.1847217615635356, "z": 0.01993302458238139 },
+            "neptune": { "x": 29.87523615642745, "y": -0.9092685619071048, "z": -0.6697285953563352 },
+            "pluto": { "x": 17.98812408480891, "y": -30.08901308450885, "z": -1.981389640987474 },
+            "saturn": { "x": 9.387522028135445, "y": -2.238790675318705, "z": -0.3346953577464323 },
+            "uranus": { "x": 11.38684141135065, "y": 15.9133227110374, "z": -0.08854031364522484 },
+            "venus": { "x": 0.03633953818810691, "y": -0.7260964761676776, "z": -0.01206884220210594 }
         };
 
-        async function obtenerDatosNEO() {
-            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                return data.data;
-            } catch (error) {
-                console.error('Error al obtener datos NEO:', error);
+        // Scaling factor for visualization purposes (adjust as needed)
+        const scaleFactor = 5e7; // Reduced scaling AU to Cesium coordinates for better visibility
+
+        // Adjusted Planet sizes (radii in kilometers scaled down for visualization)
+        const planetRadii = {
+            mercury: 1000,
+            venus: 2000,
+            earth: 2500,
+            moon: 700, // Moon radius
+            mars: 1500,
+            jupiter: 5000,
+            saturn: 4500,
+            uranus: 3000,
+            neptune: 2800,
+            pluto: 1000,
+            sun: 10000 // Scaled down Sun's radius for a better view
+        };
+
+        // Function to validate planet data
+        function isPlanetDataValid(planetPosition, planetName) {
+            if (!planetPosition || planetPosition.x === undefined || planetPosition.y === undefined || planetPosition.z === undefined) {
+                console.error(`Invalid data for ${planetName}:`, planetPosition);
+                return false;
             }
+            return true;
         }
 
-        function keplerianToCartesian(params) {
-            const semiMajorAxis = params.a;
-            const eccentricity = params.e;
-            const inclination = params.i * (Math.PI / 180);
-            const longitudeOfAscendingNode = params.om * (Math.PI / 180);
-            const argumentOfPeriapsis = params.w * (Math.PI / 180);
-            const meanAnomaly = params.ma * (Math.PI / 180);
+        // Define Sun's position relative to Earth (assuming Earth is at origin)
+        const sunPosition = {
+            x: -planetData.earth.x * scaleFactor,
+            y: -planetData.earth.y * scaleFactor,
+            z: -planetData.earth.z * scaleFactor
+        };
 
-            const E = meanAnomaly + (eccentricity * Math.sin(meanAnomaly));
-            const x = semiMajorAxis * (Math.cos(E) - eccentricity);
-            const y = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(E);
+        // Add Sun entity
+        viewer.entities.add({
+            position: new Cesium.Cartesian3(sunPosition.x, sunPosition.y, sunPosition.z),
+            ellipsoid: {
+                radii: new Cesium.Cartesian3(planetRadii.sun * 1000, planetRadii.sun * 1000, planetRadii.sun * 1000),
+                material: Cesium.Color.YELLOW
+            },
+            label: {
+                text: 'Sun',
+                font: '14pt sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                showBackground: true,
+                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -20)
+            }
+        });
 
-            const xRot = (x * (Math.cos(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) - Math.sin(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination))) -
-                         (y * (Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) + Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination)));
+        // Function to add orbits using PolylineGraphics centered on the Sun
+        function createOrbit(planetPosition, planetName) {
+            // Calculate relative position to Sun
+            const relativePosition = {
+                x: (planetPosition.x - planetData.sun.x) * scaleFactor,
+                y: (planetPosition.y - planetData.sun.y) * scaleFactor,
+                z: (planetPosition.z - planetData.sun.z) * scaleFactor
+            };
 
-            const yRot = (x * (Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) + Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) * Math.cos(inclination))) +
-                         (y * (Math.cos(argumentOfPeriapsis) * Math.cos(inclination)));
+            const centerPosition = new Cesium.Cartesian3(sunPosition.x, sunPosition.y, sunPosition.z);
 
-            const z = y * Math.sin(inclination);
+            const semiMajorAxis = Cesium.Cartesian3.distance(new Cesium.Cartesian3(0, 0, 0), new Cesium.Cartesian3(relativePosition.x, relativePosition.y, relativePosition.z));
+            const semiMinorAxis = semiMajorAxis * 0.98; // Slightly elliptical for realism
 
-            return new Cesium.Cartesian3(xRot * 149597870.7, yRot * 149597870.7, z * 149597870.7);
-        }
+            const positions = [];
+            const steps = 360; // Number of points in the orbit
 
-        function agregarNEOs(neoData) {
-            neoData.forEach(neo => {
-                const params = {
-                    a: neo[4],
-                    e: neo[3],
-                    i: neo[5],
-                    w: neo[6],
-                    om: neo[7],
-                    ma: neo[2],
-                    diameter: neo[8] || 1
-                };
+            for (let i = 0; i <= steps; i++) {
+                const angle = Cesium.Math.toRadians(i);
+                const x = semiMajorAxis * Math.cos(angle) + centerPosition.x;
+                const y = semiMinorAxis * Math.sin(angle) + centerPosition.y;
+                const z = 0 + centerPosition.z; // Assuming orbits lie in the XY plane
+                positions.push(new Cesium.Cartesian3(x, y, z));
+            }
 
-                const position = keplerianToCartesian(params);
-                const radius = params.diameter / 2 * 1000;
-
-                const asteroid = viewer.entities.add({
-                    position: position,
-                    ellipsoid: {
-                        radii: new Cesium.Cartesian3(
-                            radius * (1 + Math.random() * 0.6 - 0.3),
-                            radius * (1 + Math.random() * 0.6 - 0.3),
-                            radius * (1 + Math.random() * 0.6 - 0.3)
-                        ),
-                        material: new Cesium.ImageMaterialProperty({
-                            image: 'asteroid-1/ground_0010_color_1k.jpg',
-                            repeat: new Cesium.Cartesian2(1.0, 1.0)
-                        })
-                    },
-                    label: {
-                        text: neo[0],
-                        font: '12pt monospace',
-                        fillColor: Cesium.Color.WHITE
-                    }
-                });
-
-                // Asociar los datos del asteroide con la entidad
-                asteroid.planetData = {
-                    name: neo[0],
-                    diameter: params.diameter,
-                    eccentricity: params.e,
-                    inclination: params.i,
-                    semiMajorAxis: params.a,
-                    longitudeOfAscendingNode: params.om,
-                    argumentOfPeriapsis: params.w,
-                    meanAnomaly: params.ma
-                };
+            // Add polyline to represent the orbit
+            viewer.entities.add({
+                polyline: {
+                    positions: positions,
+                    width: 1.5,
+                    material: planetName === 'sun' ? Cesium.Color.YELLOW : Cesium.Color.WHITE.withAlpha(0.5),
+                    arcType: Cesium.ArcType.NONE
+                },
+                label: {
+                    text: `${planetName.charAt(0).toUpperCase() + planetName.slice(1)} Orbit`,
+                    font: '12pt sans-serif',
+                    fillColor: Cesium.Color.WHITE,
+                    showBackground: true,
+                    pixelOffset: new Cesium.Cartesian2(0, -20), // Adjust label position
+                    position: positions[Math.floor(steps / 2)]
+                }
             });
         }
 
-        // Agregar la Tierra como una entidad clickeable
-        const earth = viewer.entities.add({
-            name: 'Earth',
-            position: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 0.0),
-            model: {
-                uri: Cesium.IonResource.fromAssetId(3), // Modelo de la Tierra
-                minimumPixelSize: 128,
-                maximumScale: 20000
-            },
-            ellipsoid: {
-                radii: new Cesium.Cartesian3(6378137.0, 6378137.0, 6378137.0),
-                material: Cesium.Color.BLUE.withAlpha(0.0), // Hacer invisible el elipsoide
-                show: false // Ocultar el elipsoide para evitar conflictos visuales
+        // Add planets and orbits to the scene using Sun as the center
+        Object.keys(planetData).forEach(planetName => {
+            if (planetName === 'sun') {
+                // Sun is already added
+                return;
+            }
+
+            const position = planetData[planetName];
+            const radius = planetRadii[planetName] || 3000;  // Default radius if not defined
+
+            // Check if planet position is valid before proceeding
+            if (isPlanetDataValid(position, planetName)) {
+                // Adjust planet position relative to Earth (which is at origin)
+                const relativePosition = {
+                    x: (position.x - planetData.earth.x) * scaleFactor,
+                    y: (position.y - planetData.earth.y) * scaleFactor,
+                    z: (position.z - planetData.earth.z) * scaleFactor
+                };
+
+                // Add planet entity
+                viewer.entities.add({
+                    position: new Cesium.Cartesian3(relativePosition.x, relativePosition.y, relativePosition.z),
+                    ellipsoid: {
+                        radii: new Cesium.Cartesian3(radius * 1000, radius * 1000, radius * 1000),  // Scale radii for visibility
+                        material: Cesium.Color.fromRandom({ alpha: 0.8 }),
+                    },
+                    label: {
+                        text: planetName.charAt(0).toUpperCase() + planetName.slice(1),
+                        font: '14pt sans-serif',
+                        fillColor: Cesium.Color.WHITE,
+                        showBackground: true,
+                        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        pixelOffset: new Cesium.Cartesian2(0, -20)
+                    }
+                });
+
+                // Create orbit for the planet around the Sun
+                createOrbit(position, planetName);
             }
         });
-        earth.planetData = {
-            name: 'Earth',
-            diameter: 12742,
-            eccentricity: 0.0167,
-            inclination: 0
+
+        // Add Earth's orbit around the Sun
+        createOrbit(planetData.earth, 'earth');
+
+        // Add Moon as a satellite of Earth
+        createOrbit(planetData.moon, 'moon');
+
+        // Add Earth and Moon entities
+        viewer.entities.add({
+            position: new Cesium.Cartesian3(0, 0, 0),
+            ellipsoid: {
+                radii: new Cesium.Cartesian3(planetRadii.earth * 1000, planetRadii.earth * 1000, planetRadii.earth * 1000),
+                material: Cesium.Color.BLUE,
+            },
+            label: {
+                text: 'Earth',
+                font: '14pt sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                showBackground: true,
+                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -20)
+            }
+        });
+
+        // Add Moon entity
+        const moonPosition = {
+            x: (planetData.moon.x - planetData.earth.x) * scaleFactor,
+            y: (planetData.moon.y - planetData.earth.y) * scaleFactor,
+            z: (planetData.moon.z - planetData.earth.z) * scaleFactor
         };
 
-        // Mostrar el modal personalizado al hacer doble clic en una entidad
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction(function (movement) {
-            const pickedObject = viewer.scene.pick(movement.position);
-            if (Cesium.defined(pickedObject)) {
-                const entity = pickedObject.id;
-
-                if (entity.planetData) {
-                    planetName.textContent = entity.planetData.name;
-                    planetInfo.innerHTML = `
-                        <strong>Diámetro:</strong> ${entity.planetData.diameter} km<br>
-                        <strong>Excentricidad:</strong> ${entity.planetData.eccentricity}<br>
-                        <strong>Inclinación:</strong> ${entity.planetData.inclination}°<br>
-                        <strong>Eje Semi Mayor:</strong> ${entity.planetData.semiMajorAxis} AU<br>
-                        <strong>Longitud del Nodo Ascendente:</strong> ${entity.planetData.longitudeOfAscendingNode}°<br>
-                        <strong>Argumento del Periapsis:</strong> ${entity.planetData.argumentOfPeriapsis}°<br>
-                        <strong>Anomalía Media:</strong> ${entity.planetData.meanAnomaly}°
-                    `;
-                    infoModal.style.display = 'block';
-                }
+        viewer.entities.add({
+            position: new Cesium.Cartesian3(moonPosition.x, moonPosition.y, moonPosition.z),
+            ellipsoid: {
+                radii: new Cesium.Cartesian3(planetRadii.moon * 1000, planetRadii.moon * 1000, planetRadii.moon * 1000),
+                material: Cesium.Color.GRAY,
+            },
+            label: {
+                text: 'Moon',
+                font: '12pt sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                showBackground: true,
+                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -20)
             }
-        }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+        });
 
-        obtenerDatosNEO().then(neoData => {
-            if (neoData) {
-                agregarNEOs(neoData);
-            }
+        // Fly camera to Earth’s position (origin)
+        viewer.camera.flyTo({
+            destination: new Cesium.Cartesian3(0, 0, 5e8), // Adjusted for better view
+            orientation: {
+                heading: Cesium.Math.toRadians(0.0),
+                pitch: Cesium.Math.toRadians(-90.0),
+                roll: 0.0
+            },
+            duration: 2 // seconds
         });
     </script>
 </body>
