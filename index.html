@@ -3,219 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CesiumJS Orrery</title>
-    <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <title>Solar System Orrery</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/noisejs/2.0.0/perlin.min.js"></script>
     <style>
-        /* Styles for the Cesium container */
-        #cesiumContainer {
-            width: 100%;
-            height: 100vh;
-            margin: 0;
-            padding: 0;
-        }
-
-        #infoModal {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 300px;
-            z-index: 1050;
-            display: none;
-        }
-
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
             overflow: hidden;
         }
+        #headerContainer {
+            z-index: 1; /* Ensures the header is above the iframe */
+        }
+        #viewContainer {
+            position: relative;
+            height: 90vh; /* Adjust as needed */
+        }
+        iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            z-index: 0; /* Ensures the iframe is behind the header */
+        }
     </style>
 </head>
 <body>
-    <div id="cesiumContainer"></div>
-
-    <!-- Custom modal -->
-    <div class="modal-content" id="infoModal">
-        <div class="modal-header">
-            <h5 class="modal-title" id="infoModalLabel">Object Information</h5>
-            <button type="button" class="close" id="closeModal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        <div class="modal-body">
-            <h6 id="planetName">Object Name</h6>
-            <p id="planetInfo">Loading information...</p>
-        </div>
+    <!-- Include the header for view switching -->
+    <div id="headerContainer"></div>
+    
+    <div id="viewContainer">
+        <!-- Default view will be the solar system -->
+        <iframe src="solar_system_view.html" id="currentView"></iframe>
     </div>
 
-    <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script>
-        // Assign your custom Cesium Ion Access Token
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzJhZjE2NC1mOWQ2LTQ4NTItODRlMC0zZDkyMWMyYWI4ODMiLCJpZCI6MjQ2MTMxLCJpYXQiOjE3MjgxNTM2MTR9.BDbM94S9z_B2W2sq25ib4WgLdYVQgZnYegUTdWEuIes';
+        // Load the header component dynamically
+        fetch('header.html')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('headerContainer').innerHTML = data;
 
-        // Initialize the Cesium viewer
-        const viewer = new Cesium.Viewer('cesiumContainer', {
-            timeline: false,
-            animation: false,
-            fullscreenButton: false,
-            homeButton: false,
-            sceneModePicker: false,
-            baseLayerPicker: false,
-            geocoder: false,
-            navigationHelpButton: false,
-            infoBox: false,
-            selectionIndicator: false
-        });
-
-        const planetName = document.getElementById('planetName');
-        const planetInfo = document.getElementById('planetInfo');
-        const infoModal = document.getElementById('infoModal');
-        const closeModal = document.getElementById('closeModal');
-
-        // Close the modal when clicking the close button
-        closeModal.onclick = () => {
-            infoModal.style.display = 'none';
-        };
-
-        async function fetchNEOData() {
-            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                return data.data;
-            } catch (error) {
-                console.error('Error fetching NEO data:', error);
-            }
-        }
-
-        function keplerianToCartesian(params) {
-            const semiMajorAxis = params.a;
-            const eccentricity = params.e;
-            const inclination = params.i * (Math.PI / 180);
-            const longitudeOfAscendingNode = params.om * (Math.PI / 180);
-            const argumentOfPeriapsis = params.w * (Math.PI / 180);
-            const meanAnomaly = params.ma * (Math.PI / 180);
-
-            const E = meanAnomaly + (eccentricity * Math.sin(meanAnomaly));
-            const x = semiMajorAxis * (Math.cos(E) - eccentricity);
-            const y = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(E);
-
-            const xRot = (x * (Math.cos(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) - Math.sin(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination))) -
-                         (y * (Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) + Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) * Math.cos(inclination)));
-
-            const yRot = (x * (Math.cos(argumentOfPeriapsis) * Math.sin(longitudeOfAscendingNode) + Math.sin(argumentOfPeriapsis) * Math.cos(longitudeOfAscendingNode) * Math.cos(inclination))) +
-                         (y * (Math.cos(argumentOfPeriapsis) * Math.cos(inclination)));
-
-            const z = y * Math.sin(inclination);
-
-            return new Cesium.Cartesian3(xRot * 149597870.7, yRot * 149597870.7, z * 149597870.7);
-        }
-
-        function addNEOs(neoData) {
-            neoData.forEach(neo => {
-                const params = {
-                    a: neo[4],
-                    e: neo[3],
-                    i: neo[5],
-                    w: neo[6],
-                    om: neo[7],
-                    ma: neo[2],
-                    diameter: neo[8] || 1
+                // Button click events for changing views
+                document.getElementById('viewEarthClose').onclick = function() {
+                    document.getElementById('currentView').src = 'earth_close_items.html';
                 };
 
-                const position = keplerianToCartesian(params);
-                const radius = params.diameter / 2 * 1000;
-
-                const asteroid = viewer.entities.add({
-                    position: position,
-                    ellipsoid: {
-                        radii: new Cesium.Cartesian3(
-                            radius * (1 + Math.random() * 0.6 - 0.3),
-                            radius * (1 + Math.random() * 0.6 - 0.3),
-                            radius * (1 + Math.random() * 0.6 - 0.3)
-                        ),
-                        material: new Cesium.ImageMaterialProperty({
-                            image: 'asteroid-1/ground_0010_color_1k.jpg',
-                            repeat: new Cesium.Cartesian2(1.0, 1.0)
-                        })
-                    },
-                    label: {
-                        text: neo[0],
-                        font: '12pt monospace',
-                        fillColor: Cesium.Color.WHITE
-                    }
-                });
-
-                // Associate asteroid data with the entity
-                asteroid.planetData = {
-                    name: neo[0],
-                    diameter: params.diameter,
-                    eccentricity: params.e,
-                    inclination: params.i,
-                    semiMajorAxis: params.a,
-                    longitudeOfAscendingNode: params.om,
-                    argumentOfPeriapsis: params.w,
-                    meanAnomaly: params.ma
+                document.getElementById('viewSolarSystem').onclick = function() {
+                    document.getElementById('currentView').src = 'solar_system_view.html';
                 };
             });
-        }
-
-        // Add Earth as a clickable entity
-        const earth = viewer.entities.add({
-            name: 'Earth',
-            position: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 0.0),
-            model: {
-                uri: Cesium.IonResource.fromAssetId(3), // Earth model
-                minimumPixelSize: 128,
-                maximumScale: 20000
-            },
-            ellipsoid: {
-                radii: new Cesium.Cartesian3(6378137.0, 6378137.0, 6378137.0),
-                material: Cesium.Color.BLUE.withAlpha(0.0), // Make the ellipsoid invisible
-                show: false // Hide the ellipsoid to avoid visual conflicts
-            }
-        });
-        earth.planetData = {
-            name: 'Earth',
-            diameter: 12742,
-            eccentricity: 0.0167,
-            inclination: 0
-        };
-
-        // Show the custom modal when double-clicking an entity
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction(function (movement) {
-            const pickedObject = viewer.scene.pick(movement.position);
-            if (Cesium.defined(pickedObject)) {
-                const entity = pickedObject.id;
-
-                if (entity.planetData) {
-                    planetName.textContent = entity.planetData.name;
-                    planetInfo.innerHTML = `
-                        <strong>Diameter:</strong> ${entity.planetData.diameter} km<br>
-                        <strong>Eccentricity:</strong> ${entity.planetData.eccentricity}<br>
-                        <strong>Inclination:</strong> ${entity.planetData.inclination}°<br>
-                        <strong>Semi-Major Axis:</strong> ${entity.planetData.semiMajorAxis} AU<br>
-                        <strong>Longitude of Ascending Node:</strong> ${entity.planetData.longitudeOfAscendingNode}°<br>
-                        <strong>Argument of Periapsis:</strong> ${entity.planetData.argumentOfPeriapsis}°<br>
-                        <strong>Mean Anomaly:</strong> ${entity.planetData.meanAnomaly}° 
-                    `;
-                    infoModal.style.display = 'block';
-                }
-            }
-        }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-
-        fetchNEOData().then(neoData => {
-            if (neoData) {
-                addNEOs(neoData);
-            }
-        });
     </script>
 </body>
 </html>
