@@ -157,7 +157,11 @@
                     name: neo[0],
                     diameter: params.diameter,
                     eccentricity: params.e,
-                    inclination: params.i
+                    inclination: params.i,
+                    semiMajorAxis: params.a,
+                    longitudeOfAscendingNode: params.om,
+                    argumentOfPeriapsis: params.w,
+                    meanAnomaly: params.ma
                 };
             });
         }
@@ -196,7 +200,11 @@
                     planetInfo.innerHTML = `
                         <strong>Diámetro:</strong> ${entity.planetData.diameter} km<br>
                         <strong>Excentricidad:</strong> ${entity.planetData.eccentricity}<br>
-                        <strong>Inclinación:</strong> ${entity.planetData.inclination}°
+                        <strong>Inclinación:</strong> ${entity.planetData.inclination}°<br>
+                        <strong>Eje Semi Mayor:</strong> ${entity.planetData.semiMajorAxis} AU<br>
+                        <strong>Longitud del Nodo Ascendente:</strong> ${entity.planetData.longitudeOfAscendingNode}°<br>
+                        <strong>Argumento del Periapsis:</strong> ${entity.planetData.argumentOfPeriapsis}°<br>
+                        <strong>Anomalía Media:</strong> ${entity.planetData.meanAnomaly}°
                     `;
                     infoModal.style.display = 'block';
                 }
