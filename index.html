@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CesiumJS Orrery</title>
     <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noisejs/2.0.0/perlin.min.js"></script>
     <style>
         /* Estilos para el contenedor de Cesium */
         #cesiumContainer {
@@ -106,7 +105,7 @@
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`); 
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
                 console.log(data.data); // Verificar la respuesta
@@ -143,7 +142,6 @@
         }
 
         function agregarNEOs(neoData) {
-            console.log("Agregando NEOs:", neoData); // Agrega esta línea para ver qué datos se están procesando
             neoData.forEach(neo => {
                 const params = {
                     a: neo[4],  // Semieje mayor
@@ -152,20 +150,29 @@
                     w: neo[6],  // Argumento del perihelio
                     om: neo[7], // Longitud del nodo ascendente
                     ma: neo[2], // Anomalía media
-                    diameter: neo[8] || 1 // Usar el diámetro si está disponible o 1 km como valor predeterminado
+                    diameter: neo[8] || 1  // Diámetro aproximado (en km)
                 };
-                
+
+                // Calcular la posición en coordenadas cartesianas
                 const position = keplerianToCartesian(params);
-                
-                // Escalar el tamaño del objeto basándose en el diámetro
+                const radius = params.diameter / 2 * 1000;  // Convertir a metros
+
+                // Añadir el asteroide como entidad elipsoide con variación de forma para simular un asteroide de forma irregular
                 viewer.entities.add({
                     position: position,
                     ellipsoid: {
-                        radii: new Cesium.Cartesian3(params.diameter / 2 * 1000, params.diameter / 2 * 1000, params.diameter / 2 * 1000), // Convertir a metros
-                        material: Cesium.Color.RED.withAlpha(0.6),
+                        radii: new Cesium.Cartesian3(
+                            radius * (1 + Math.random() * 0.6 - 0.3),  // Mayor variación aleatoria en cada eje para simular formas irregulares
+                            radius * (1 + Math.random() * 0.6 - 0.3),
+                            radius * (1 + Math.random() * 0.6 - 0.3)
+                        ),
+                        material: new Cesium.ImageMaterialProperty({
+                            image: 'asteroid-1/ground_0010_color_1k.jpg',  // Ruta de la imagen local para texturizar el asteroide
+                            repeat: new Cesium.Cartesian2(1.0, 1.0)
+                        })
                     },
                     label: {
-                        text: neo[0],  // Nombre del objeto
+                        text: neo[0],  // Nombre del NEO
                         font: '12pt monospace',
                         fillColor: Cesium.Color.WHITE,
                     }
@@ -173,27 +180,12 @@
             });
         }
 
-        // Llamamos a la función para obtener los datos y agregarlos al visor
-        obtenerDatosNEO().then(agregarNEOs);
-
-        viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(0, 0, 5000000), // Ajusta el tercer parámetro para controlar la altura
-        });
-
-        viewer.entities.add({
-            position: Cesium.Cartesian3.fromDegrees(-122.22, 37.77, 1000000), // Coordenadas de ejemplo
-            point: {
-                pixelSize: 10,
-                color: Cesium.Color.RED,
-            },
-            label: {
-                text: "NEO Prueba",  // Nombre del objeto
-                font: '12pt monospace',
-                fillColor: Cesium.Color.WHITE,
+        // Obtener los datos y agregar los NEOs al visor
+        obtenerDatosNEO().then(neoData => {
+            if (neoData) {
+                agregarNEOs(neoData);
             }
         });
-
-        // Aquí puedes agregar tu código para personalizar el visor o agregar entidades
     </script>
 </body>
 </html>
