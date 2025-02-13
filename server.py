@@ -1,10 +1,11 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
 from astroquery.jplhorizons import Horizons
 from astropy.time import Time
 import datetime
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)  # Enable CORS for all routes
 
 # Mapping of planet names to their Horizons IDs
@@ -47,6 +48,18 @@ PHA_IDS = {
     'apophis': '99942',
     # Add more PHAs as needed
 }
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/solar_system')
+def solar_system():
+    return render_template('solar_system_view.html')
+
+@app.route('/earth_close_items')
+def earth_close_items():
+    return render_template('earth_close_items.html')
 
 @app.route('/api/object_positions', methods=['GET'])
 def get_object_positions():
@@ -111,6 +124,10 @@ def get_object_positions():
             object_positions[nombre] = {'error': str(e)}
 
     return jsonify(object_positions)
+
+@app.route("/header")
+def header():
+    return render_template("header.html") 
 
 if __name__ == '__main__':
     app.run(debug=True)

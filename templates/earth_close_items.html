@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Earth Close Items</title>
-    <link href="node_modules/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.104/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noisejs/2.0.0/perlin.min.js"></script>
     <style>
@@ -48,7 +48,7 @@
         </div>
     </div>
 
-    <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.104/Build/Cesium/Cesium.js"></script>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script>
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzJhZjE2NC1mOWQ2LTQ4NTItODRlMC0zZDkyMWMyYWI4ODMiLCJpZCI6MjQ2MTMxLCJpYXQiOjE3MjgxNTM2MTR9.BDbM94S9z_B2W2sq25ib4WgLdYVQgZnYegUTdWEuIes'; // Replace with your Cesium Ion access token
@@ -76,7 +76,8 @@
         };
 
         async function fetchNEOData() {
-            const url = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
+            const url = "https://corsproxy.io/?https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,epoch,e,a,i,om,w,ma,diameter,neo,kind&sb-class=IEO";
+
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -136,7 +137,7 @@
                             radius * (1 + Math.random() * 0.6 - 0.3)
                         ),
                         material: new Cesium.ImageMaterialProperty({
-                            image: 'asteroid-1/ground_0010_color_1k.jpg',
+                            image: 'assets/asteroid-1/ground_0010_color_1k.jpg',
                             repeat: new Cesium.Cartesian2(1.0, 1.0)
                         })
                     },

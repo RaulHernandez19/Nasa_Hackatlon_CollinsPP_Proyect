@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Orrery</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Botones con fondo blanco y texto negro */
+        .btn {
+            background-color: white;
+            color: black;
+            border: 1px solid black;
+        }
+
+        /* Cuando el botón está seleccionado o se le hace hover */
+        .btn:active, .btn.selected {
+            background-color: blue !important;
+            color: dark !important;
+            border-color: blue !important;
+        }
+
+        /* Contenedor del header con borde blanco solo abajo */
+        #headerContainer {
+            z-index: 1;
+            border-bottom: 2px solid white;
+            background-color: #333; /* Color de fondo para que resalte */
+            padding: 10px;
+            text-align: center;
+        }
+
+        #viewContainer {
+            position: relative;
+            height: 100vh;
+        }
+
+        iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header con botones -->
+    <div id="headerContainer">
+        <button class="btn" id="viewEarthClose">View Earth Close Items</button>
+        <button class="btn" id="viewSolarSystem">View Solar System</button>
+    </div>
+    
+    <div id="viewContainer">
+        <iframe src="/solar_system" id="currentView"></iframe>
+    </div>
+
+    <script>
+        // Función para cambiar el iframe y marcar el botón seleccionado
+        function changeView(view, buttonId) {
+            document.getElementById('currentView').src = view;
+            
+            // Remover la clase 'selected' de todos los botones
+            document.querySelectorAll('.btn').forEach(btn => btn.classList.remove('selected'));
+            
+            // Agregar la clase 'selected' al botón actual
+            document.getElementById(buttonId).classList.add('selected');
+        }
+
+        // Eventos para cambiar de vista
+        document.getElementById('viewEarthClose').onclick = function() {
+            changeView('/earth_close_items', 'viewEarthClose');
+        };
+
+        document.getElementById('viewSolarSystem').onclick = function() {
+            changeView('/solar_system', 'viewSolarSystem');
+        };
+    </script>
+</body>
+</html>
